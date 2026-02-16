@@ -1,29 +1,22 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Importamos el hook de navegación
 import {
-    Container, Typography, Paper, Grid, Button,
+    Container, Typography, Paper, Button,
     Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, CircularProgress,
-    Snackbar, Alert, Box, TextField
+    Snackbar, Alert, Box, Stack
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 
-import {
-    getCategorias,
-    createCategoria,
-    updateCategoria,
-    deleteCategoria
-} from '../../services/categoriaService';
-
+import { getCategorias, deleteCategoria } from '../../services/categoriaService';
 import { getAuthUsuario } from '../../utils/auth';
 
 const CategoriasPage = () => {
-
+    const navigate = useNavigate();
     const usuario = getAuthUsuario();
 
     const [loading, setLoading] = useState(true);
     const [categorias, setCategorias] = useState([]);
-    const [nombre, setNombre] = useState('');
-
     const [notification, setNotification] = useState({
         open: false,
         message: '',
@@ -33,62 +26,27 @@ const CategoriasPage = () => {
     const fetchCategorias = async () => {
         try {
             setLoading(true);
-            const response = await getCategorias();
+            const response = await getCategorias({});
             setCategorias(response.data);
         } catch (error) {
-            setNotification({
-                open: true,
-                message: 'Error al cargar categorías',
-                severity: 'error'
-            });
+            showNotification('Error al cargar categorías', 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCrear = async () => {
-        try {
-            await createCategoria({ nombre });
-
-            setNotification({
-                open: true,
-                message: 'Categoría creada correctamente',
-                severity: 'success'
-            });
-
-            setNombre('');
-            fetchCategorias();
-
-        } catch (error) {
-            setNotification({
-                open: true,
-                message:
-                    error.response?.data?.errores?.[0] ||
-                    error.response?.data?.msg ||
-                    'Error al crear categoría',
-                severity: 'error'
-            });
-        }
+    const showNotification = (message, severity = 'success') => {
+        setNotification({ open: true, message, severity });
     };
 
     const handleEliminar = async (id) => {
+        if (!window.confirm('¿Estás seguro de eliminar esta categoría?')) return;
         try {
             await deleteCategoria(id);
-
-            setNotification({
-                open: true,
-                message: 'Categoría eliminada correctamente',
-                severity: 'success'
-            });
-
+            showNotification('Categoría eliminada correctamente');
             fetchCategorias();
-
         } catch (error) {
-            setNotification({
-                open: true,
-                message: 'Error al eliminar categoría',
-                severity: 'error'
-            });
+            showNotification('Error al eliminar categoría', 'error');
         }
     };
 
@@ -98,84 +56,81 @@ const CategoriasPage = () => {
 
     return (
         <Container maxWidth="lg" sx={{ mt: 3, mb: 4 }}>
+            
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                    Gestión de Categorías
+                </Typography>
 
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Gestión de Categorías
-            </Typography>
-
-            {/* CREAR CATEGORÍA */}
-            {usuario?.rol === 'Administrador' && (
-                <Paper sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom>
+                {/* BOTÓN CREAR: Ahora redirige a la otra página */}
+                {usuario?.rol === 'Administrador' && (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => navigate('/categoria/create')} 
+                    >
                         Nueva Categoría
-                    </Typography>
+                    </Button>
+                )}
+            </Stack>
 
-                    <Grid container spacing={2} alignItems="center">
-
-                        <Grid item xs={12} sm={8}>
-                            <TextField
-                                fullWidth
-                                label="Nombre"
-                                value={nombre}
-                                onChange={(e) => setNombre(e.target.value)}
-                            />
-                        </Grid>
-
-                        <Grid item xs={12} sm={4}>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={handleCrear}
-                                fullWidth
-                            >
-                                Crear
-                            </Button>
-                        </Grid>
-
-                    </Grid>
-                </Paper>
-            )}
-
-            {/* LISTADO */}
             {loading ? (
-                <Box textAlign="center">
-                    <CircularProgress />
-                </Box>
+                <Box textAlign="center" sx={{ mt: 5 }}><CircularProgress /></Box>
             ) : (
-                <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                        Lista de Categorías
-                    </Typography>
-
+                <Paper sx={{ p: 2, borderRadius: 2 }}>
                     <TableContainer>
                         <Table>
                             <TableHead>
-                                <TableRow>
-                                    <TableCell>Nombre</TableCell>
+                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                    <TableCell><strong>Nombre</strong></TableCell>
+                                    <TableCell><strong>Descripción</strong></TableCell>
                                     {usuario?.rol === 'Administrador' && (
-                                        <TableCell align="center">Acciones</TableCell>
+                                        <TableCell align="center"><strong>Acciones</strong></TableCell>
                                     )}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {categorias.map((cat) => (
-                                    <TableRow key={cat._id}>
-                                        <TableCell>{cat.nombre}</TableCell>
-
+                                    <TableRow key={cat._id} hover>
+                                        <TableCell sx={{ fontWeight: 500 }}>{cat.nombre}</TableCell>
+                                        <TableCell>{cat.descripcion}</TableCell>
+                                        
                                         {usuario?.rol === 'Administrador' && (
                                             <TableCell align="center">
-                                                <Button
-                                                    color="error"
-                                                    startIcon={<DeleteIcon />}
-                                                    onClick={() => handleEliminar(cat._id)}
-                                                >
-                                                    Eliminar
-                                                </Button>
+                                                <Stack direction="row" spacing={1} justifyContent="center">
+                                                    {/* BOTÓN EDITAR */}
+                                                    <Button
+                                                        variant="outlined"
+                                                        size="small"
+                                                        startIcon={<EditIcon />}
+                                                        onClick={() => navigate(`/categoria/edit/${cat._id}`)}
+                                                    >
+                                                        Editar
+                                                    </Button>
+
+                                                    {/* BOTÓN ELIMINAR */}
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="error"
+                                                        size="small"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleEliminar(cat._id)}
+                                                    >
+                                                        Eliminar
+                                                    </Button>
+                                                </Stack>
                                             </TableCell>
                                         )}
                                     </TableRow>
                                 ))}
+                                {categorias.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                                            No hay categorías registradas.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </TableContainer>
@@ -186,12 +141,12 @@ const CategoriasPage = () => {
                 open={notification.open}
                 autoHideDuration={4000}
                 onClose={() => setNotification({ ...notification, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert severity={notification.severity}>
+                <Alert severity={notification.severity} variant="filled" sx={{ width: '100%' }}>
                     {notification.message}
                 </Alert>
             </Snackbar>
-
         </Container>
     );
 };

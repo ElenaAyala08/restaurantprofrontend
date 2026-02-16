@@ -1,70 +1,140 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Paper, Typography, TextField, Button, Box, Grid, Divider, Stack, MenuItem } from '@mui/material';
-import { Assessment as AssessmentIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { 
+    Container, Paper, Typography, TextField, Button, 
+    Box, Grid, Stack, MenuItem, Snackbar, Alert, CircularProgress 
+} from '@mui/material';
+import { Save as SaveIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 
-import { createReporte } from '../../services/reporteService'; // Asumiendo que existe
-import ErrorMessage from '../../components/ErrorMessage';
+// Servicios y validación
+import { createReporte } from '../../services/reporteService';
+import { getAuthUsuario } from '../../utils/auth';
+import { reporteZodSchema } from '../../schemas/reporte';
 
 const CreateReportePage = () => {
     const navigate = useNavigate();
-    const [errors, setErrors] = useState([]);
-    const [formData, setFormData] = useState({
-        rango: 'hoy',
-        descripcion: ''
-    });
+    const usuario = getAuthUsuario();
+    
+    const [loading, setLoading] = useState(false);
+    const [rango, setRango] = useState('hoy');
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validar con Zod antes de enviar
+        const validacion = reporteZodSchema.safeParse({ rango });
+        if (!validacion.success) {
+            setNotification({
+                open: true,
+                message: validacion.error.issues[0].message,
+                severity: 'error'
+            });
+            return;
+        }
+
+        setLoading(true);
         try {
-            // Aquí llamarías a tu servicio para guardar el reporte
-            await createReporte(formData); 
-            navigate('/reportes');
+            // Estructura que espera tu reporteSchema de Mongoose
+            const reporteData = {
+                tipoReporte: rango,
+                generadoPor: usuario?.id, // ID del administrador logueado
+                resumen: {
+                    ingresosTotales: 0, // El backend suele calcular esto, pero enviamos base
+                    facturasPagadas: 0,
+                    ticketPromedio: 0,
+                    pedidosTotales: 0
+                }
+            };
+
+            await createReporte(reporteData);
+
+            setNotification({
+                open: true,
+                message: 'Reporte generado y guardado con éxito',
+                severity: 'success'
+            });
+
+            // Redirigir a la lista de reportes tras un breve delay
+            setTimeout(() => navigate('/reportes'), 1500);
+
         } catch (error) {
-            setErrors([{ campo: 'SERVER', mensaje: error.message }]);
+            setNotification({
+                open: true,
+                message: error.response?.data?.error || 'Error al generar el reporte',
+                severity: 'error'
+            });
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
         <Container maxWidth="sm" sx={{ mt: 8 }}>
-            <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
-                <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                    Nuevo Reporte
+            <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 4 }}>
+                    <Button 
+                        startIcon={<ArrowBackIcon />} 
+                        onClick={() => navigate('/reportes')}
+                        sx={{ color: 'text.secondary' }}
+                    >
+                        Volver
+                    </Button>
+                </Stack>
+
+                <Typography variant="h4" align="center" sx={{ fontWeight: 'bold', mb: 2 }}>
+                    Generar Nuevo Reporte
                 </Typography>
-                <Divider sx={{ mb: 4 }} />
-                <form onSubmit={handleSubmit}>
+                <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 4 }}>
+                    Seleccione el periodo contable para procesar las ventas.
+                </Typography>
+
+                <Box component="form" onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
                             <TextField
-                                fullWidth select label="Rango de Ventas"
-                                value={formData.rango}
-                                onChange={(e) => setFormData({ ...formData, rango: e.target.value })}
+                                select
+                                fullWidth
+                                label="Periodo del Reporte"
+                                value={rango}
+                                onChange={(e) => setRango(e.target.value)}
+                                disabled={loading}
+                                helperText="Este proceso consolidará las facturas pagadas en el rango seleccionado."
                             >
                                 <MenuItem value="hoy">Ventas de Hoy</MenuItem>
                                 <MenuItem value="semana">Últimos 7 días</MenuItem>
-                                <MenuItem value="mes">Último Mes</MenuItem>
-                                <MenuItem value="todo">Histórico Total</MenuItem>
+                                <MenuItem value="mes">Últimos 30 días</MenuItem>
+                                <MenuItem value="todo">Histórico Completo</MenuItem>
                             </TextField>
                         </Grid>
+
                         <Grid item xs={12}>
-                            <TextField
-                                fullWidth label="Notas del Reporte" multiline rows={2}
-                                value={formData.descripcion}
-                                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <Stack direction="row" spacing={2}>
-                                <Button variant="outlined" onClick={() => navigate('/reportes')}>Cancelar</Button>
-                                <Button type="submit" variant="contained" startIcon={<AssessmentIcon />} fullWidth>
-                                    Generar Reporte
-                                </Button>
-                            </Stack>
+                            <Button
+                                type="submit"
+                                fullWidth
+                                variant="contained"
+                                size="large"
+                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                                disabled={loading}
+                                sx={{ py: 1.5, fontWeight: 'bold' }}
+                            >
+                                {loading ? 'Procesando...' : 'Confirmar y Guardar'}
+                            </Button>
                         </Grid>
                     </Grid>
-                </form>
-                <Box sx={{ mt: 3 }}><ErrorMessage errors={errors} /></Box>
+                </Box>
             </Paper>
+
+            <Snackbar
+                open={notification.open}
+                autoHideDuration={4000}
+                onClose={() => setNotification({ ...notification, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity={notification.severity} variant="filled" sx={{ width: '100%' }}>
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };

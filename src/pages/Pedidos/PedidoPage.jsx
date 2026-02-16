@@ -1,142 +1,208 @@
-import React, { useEffect, useState } from 'react';
-import { 
-    Container, Typography, Paper, Grid, Button,
-    Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, CircularProgress,
-    Snackbar, Alert, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+    Container, Paper, Typography, Button, Table, TableBody,
+    TableCell, TableContainer, TableHead, TableRow, IconButton,
+    Chip, Stack, Box, Tooltip, CircularProgress, Alert
 } from '@mui/material';
-import { Search as SearchIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
+import {
+    Add as AddIcon,
+    Visibility as ViewIcon,
+    Edit as EditIcon,
+    Delete as DeleteIcon,
+    Restaurant as RestaurantIcon
+} from '@mui/icons-material';
 
-import { getPedidos } from '../../services/pedidoService';
-// Importamos el servicio que trae los items específicos de un pedido
-import { getDetallePedido } from '../../services/detallePedidoService'; 
+// Importación de servicios
+import { getPedidos, deletePedido } from '../../services/pedidoService';
+
+const getStatusColor = (estado) => {
+    switch (estado) {
+        case 'pagado':
+            return 'success';   // Verde
+        case 'servido':
+            return 'info';      // Azul (antes decía entregado)
+        case 'pendiente':
+            return 'warning';    // Naranja
+        case 'cancelado':
+            return 'error';      // Rojo
+        default:
+            return 'default';
+    }
+};
 
 const PedidosPage = () => {
+    const navigate = useNavigate();
+    const [pedidos, setPedidos] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [data, setData] = useState([]);
-    
-    // Estados para el Modal de Detalle
-    const [openModal, setOpenModal] = useState(false);
-    const [detalles, setDetalles] = useState([]);
-    const [loadingDetalle, setLoadingDetalle] = useState(false);
+    const [error, setError] = useState(null);
 
-    const [notification, setNotification] = useState({ 
-        open: false, message: '', severity: 'success' 
-    });
-
+    // Cargar la lista de pedidos al entrar
     const fetchPedidos = async () => {
         try {
             setLoading(true);
-            const response = await getPedidos();
-            setData(response.data);
-        } catch (error) {
-            setNotification({ open: true, message: 'Error al cargar los pedidos', severity: 'error' });
-        } finally { setLoading(false); }
+            const res = await getPedidos({});
+            // Ordenar por fecha: los más recientes arriba
+            const data = res.data || res;
+            setPedidos(data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            setError(null);
+        } catch (err) {
+            setError('No se pudieron cargar los pedidos. Verifique la conexión.');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // Función para ver el detalle de un pedido específico
-    const handleVerDetalle = async (pedidoId) => {
-        try {
-            setLoadingDetalle(true);
-            setOpenModal(true);
-            const response = await getDetallesByPedidoId(pedidoId);
-            setDetalles(response.data);
-        } catch (error) {
-            setNotification({ open: true, message: 'No se pudieron obtener los detalles', severity: 'error' });
-            setOpenModal(false);
-        } finally { setLoadingDetalle(false); }
+    useEffect(() => {
+        fetchPedidos();
+    }, []);
+
+    const handleDelete = async (id) => {
+        if (window.confirm('¿Está seguro de eliminar esta comanda?')) {
+            try {
+                await deletePedido(id);
+                fetchPedidos(); // Recargar lista
+            } catch (err) {
+                alert('Error al eliminar el pedido');
+            }
+        }
     };
 
-    useEffect(() => { fetchPedidos(); }, []);
+    // Formateador de moneda (Colones)
+    const formatMoney = (amount) => `₡${amount.toLocaleString()}`;
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 3, mb: 4 }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Gestión de Pedidos
-            </Typography>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+            <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
 
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Button variant="contained" color="success" startIcon={<SearchIcon />} onClick={fetchPedidos}>
-                    Actualizar Lista
-                </Button>
-            </Paper>
+                {/* CABECERA */}
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
+                    <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <RestaurantIcon color="primary" fontSize="large" />
+                            Gestión de Pedidos
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Listado de pedidos activos y facturación
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        size="large"
+                        onClick={() => navigate('/pedidos/create')}
+                        sx={{ fontWeight: 'bold', borderRadius: 2 }}
+                    >
+                        Nuevo Pedido
+                    </Button>
+                </Stack>
 
-            {loading ? (
-                <Box textAlign="center"><CircularProgress /></Box>
-            ) : (
-                <Paper sx={{ p: 3 }}>
-                    <TableContainer>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : (
+                    <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
                         <Table>
-                            <TableHead>
+                            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                                 <TableRow>
-                                    <TableCell>Mesa</TableCell>
-                                    <TableCell>Total</TableCell>
-                                    <TableCell>Estado</TableCell>
-                                    <TableCell>Fecha</TableCell>
-                                    <TableCell align="center">Acciones</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Mesa</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Items</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Total (IVA Inc.)</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Fecha/Hora</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {data.map((pedido) => (
-                                    <TableRow key={pedido._id}>
-                                        <TableCell>{pedido.mesa?.numero || 'N/A'}</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>${pedido.total}</TableCell>
-                                        <TableCell>{pedido.estado || 'pendiente'}</TableCell>
-                                        <TableCell>{new Date(pedido.createdAt).toLocaleDateString()}</TableCell>
-                                        <TableCell align="center">
-                                            <IconButton color="primary" onClick={() => handleVerDetalle(pedido._id)}>
-                                                <VisibilityIcon />
-                                            </IconButton>
+                                {pedidos.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                            No hay pedidos registrados actualmente.
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                ) : (
+                                    pedidos.map((pedido) => (
+                                        <TableRow key={pedido._id} hover>
+                                            {/* MESA */}
+                                            <TableCell>
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                                    Mesa #{pedido.mesa?.numero || 'N/A'}
+                                                </Typography>
+                                            </TableCell>
+
+                                            {/* ITEMS (Resumen) */}
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {pedido.items.length} productos
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {pedido.items.slice(0, 2).map(i => i.nombre).join(', ')}
+                                                    {pedido.items.length > 2 ? '...' : ''}
+                                                </Typography>
+                                            </TableCell>
+
+                                            {/* TOTAL */}
+                                            <TableCell>
+                                                <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                    {formatMoney(pedido.total)}
+                                                </Typography>
+                                            </TableCell>
+
+                                            {/* ESTADO */}
+                                            <TableCell>
+                                                <Chip
+                                                    label={pedido.estado}
+                                                    color={getStatusColor(pedido.estado)}
+                                                    size="small"
+                                                    sx={{ fontWeight: 'bold', textTransform: 'capitalize' }}
+                                                />
+                                            </TableCell>
+
+                                            {/* FECHA */}
+                                            <TableCell>
+                                                <Typography variant="caption">
+                                                    {new Date(pedido.createdAt).toLocaleString('es-CR', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        day: '2-digit',
+                                                        month: '2-digit'
+                                                    })}
+                                                </Typography>
+                                            </TableCell>
+
+                                            {/* BOTONES DE ACCIÓN */}
+                                            <TableCell align="center">
+                                                <Stack direction="row" spacing={1} justifyContent="center">
+                                                    <Tooltip title="Ver Detalle">
+                                                        <IconButton
+                                                            color="info"
+                                                            onClick={() => navigate(`/pedidos/detalle/${pedido._id}`)}
+                                                        >
+                                                            <ViewIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Editar Pedido">
+                                                        <IconButton
+                                                            color="secondary"
+                                                            onClick={() => navigate(`/pedidos/edit/${pedido._id}`)}
+                                                        >
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Paper>
-            )}
-
-            {/* MODAL DE DETALLES DEL PEDIDO */}
-            <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm">
-                <DialogTitle sx={{ fontWeight: 'bold' }}>Detalle del Pedido</DialogTitle>
-                <DialogContent dividers>
-                    {loadingDetalle ? (
-                        <Box display="flex" justifyContent="center"><CircularProgress size={24} /></Box>
-                    ) : (
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Producto</TableCell>
-                                    <TableCell align="center">Cant.</TableCell>
-                                    <TableCell align="right">Precio Unit.</TableCell>
-                                    <TableCell align="right">Subtotal</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {detalles.map((item) => (
-                                    <TableRow key={item._id}>
-                                        <TableCell>{item.producto?.nombre || 'Desconocido'}</TableCell>
-                                        <TableCell align="center">{item.cantidad}</TableCell>
-                                        <TableCell align="right">${item.precioUnitario}</TableCell>
-                                        <TableCell align="right">${(item.cantidad * item.precioUnitario).toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenModal(false)}>Cerrar</Button>
-                </DialogActions>
-            </Dialog>
-
-            <Snackbar
-                open={notification.open}
-                autoHideDuration={4000}
-                onClose={() => setNotification({ ...notification, open: false })}
-            >
-                <Alert severity={notification.severity}>{notification.message}</Alert>
-            </Snackbar>
+                )}
+            </Paper>
         </Container>
     );
 };

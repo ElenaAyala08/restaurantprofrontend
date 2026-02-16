@@ -1,22 +1,12 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  Box, 
-  TextField, 
-  Button, 
-  Typography, 
-  Container, 
-  Paper, 
-  Grid, 
-  Stack, 
-  Divider,
-  CircularProgress,
-  MenuItem
+  Box, TextField, Button, Typography, Container, Paper, 
+  Grid, Stack, Divider, CircularProgress, MenuItem
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import CancelIcon from '@mui/icons-material/Cancel';
 
-// Servicios y validaciones (Adaptados a Reportes)
 import { getReporteById, updateReporte } from '../../services/reporteService';
 import { reporteZodSchema } from '../../schemas/reporte';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -27,25 +17,20 @@ const EditReportePage = () => {
     const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState([]);
     
-    
     const [formData, setFormData] = useState({
-        rango: '',
-        descripcion: '',
-        estado: ''
+        rango: '' // Usamos rango para validar con Zod antes de enviar
     });
 
     useEffect(() => {
         const fetchReporte = async () => {
             try {
                 const response = await getReporteById(id);
+                // Mapeamos tipoReporte del backend al campo rango del formulario
                 setFormData({
-                    rango: response.data.rango || 'hoy',
-                    descripcion: response.data.descripcion || '',
-                    estado: response.data.estado || 'pendiente'
+                    rango: response.data.tipoReporte || 'hoy'
                 });
             } catch (error) {
-                console.error('Error fetching reporte:', error);
-                setErrors([{ campo: 'SERVER', mensaje: 'No se pudo cargar la información del reporte.' }]);
+                setErrors([{ campo: 'SERVER', mensaje: 'No se pudo cargar el reporte.' }]);
             } finally {
                 setLoading(false);
             }
@@ -54,126 +39,88 @@ const EditReportePage = () => {
     }, [id]);
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData({ rango: e.target.value });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrors([]);
 
+        const resultado = reporteZodSchema.safeParse(formData);
+        
+        if (!resultado.success) {
+            const listaErrores = resultado.error.issues.map(issue => ({
+                campo: issue.path[0],
+                mensaje: issue.message
+            }));
+            return setErrors(listaErrores);
+        }
+
         try {
-            const resultado = reporteZodSchema.safeParse(formData);
-            
-            if (!resultado.success) {
-                const listaErrores = resultado.error.issues.map(issue => ({
-                    campo: issue.path[0],
-                    mensaje: issue.message
-                }));
-                setErrors(listaErrores);
-            } else {
-                await updateReporte(id, formData);
-                navigate('/reportes'); // O la ruta que uses
-            }
+            // Enviamos tipoReporte para que coincida con el modelo de Mongoose
+            await updateReporte(id, { tipoReporte: formData.rango });
+            navigate('/reportes');
         } catch (error) {
-            let serverMessage = error.response?.data?.error || 'Error en el servidor';
-            setErrors([{ campo: 'SERVER', mensaje: serverMessage }]);
+            setErrors([{ campo: 'SERVER', mensaje: error.response?.data?.error || 'Error al actualizar' }]);
         }
     };
 
-    if (loading) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-                <CircularProgress />
-            </Box>
-        );
-    }
+    if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
 
     return (
-        <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-            <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-                <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold', mb: 4 }}>
-                    Editar Reporte
-                </Typography>
+        <Container maxWidth="sm" sx={{ mt: 4 }}>
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+            <Typography variant="h5" gutterBottom align="center" sx={{ fontWeight: 'bold', mb: 4 }}>
+              Actualizar Configuración de Reporte
+            </Typography>
 
-                <Box component="form" onSubmit={handleSubmit} noValidate>
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                select
-                                label="Rango de Tiempo"
-                                name="rango"
-                                value={formData.rango}
-                                onChange={handleChange}
-                                variant="outlined"
-                                required
-                            >
-                                <MenuItem value="hoy">Hoy</MenuItem>
-                                <MenuItem value="semana">Semana</MenuItem>
-                                <MenuItem value="mes">Mes</MenuItem>
-                                <MenuItem value="todo">Todo</MenuItem>
-                            </TextField>
-                        </Grid>
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Rango de Tiempo"
+                    value={formData.rango}
+                    onChange={handleChange}
+                    variant="outlined"
+                  >
+                    <MenuItem value="hoy">Hoy</MenuItem>
+                    <MenuItem value="semana">Semana</MenuItem>
+                    <MenuItem value="mes">Mes</MenuItem>
+                    <MenuItem value="todo">Todo</MenuItem>
+                  </TextField>
+                </Grid>
 
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Estado del Reporte"
-                                name="estado"
-                                value={formData.estado}
-                                onChange={handleChange}
-                                variant="outlined"
-                            />
-                        </Grid>
+                <Grid item xs={12}>
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      fullWidth
+                      startIcon={<EditIcon />}
+                    >
+                      Actualizar
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => navigate('/reportes')}
+                      startIcon={<CancelIcon />}
+                    >
+                      Cancelar
+                    </Button>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </Box>
 
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Descripción / Notas"
-                                name="descripcion"
-                                value={formData.descripcion}
-                                onChange={handleChange}
-                                variant="outlined"
-                                multiline
-                                rows={4}
-                            />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    color="primary"
-                                    fullWidth
-                                    size="large"
-                                    startIcon={<EditIcon />}
-                                >
-                                    Actualizar Reporte
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="inherit"
-                                    fullWidth
-                                    size="large"
-                                    onClick={() => navigate('/reportes')}
-                                    startIcon={<CancelIcon />}
-                                >
-                                    Cancelar
-                                </Button>
-                            </Stack>
-                        </Grid>
-                    </Grid>
-                </Box>
-
-                {errors.length > 0 && (
-                    <Box sx={{ mt: 4 }}>
-                        <Divider sx={{ mb: 2 }} />
-                        <ErrorMessage errors={errors} />
-                    </Box>
-                )}
-            </Paper>
+            {errors.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <ErrorMessage errors={errors} />
+              </Box>
+            )}
+          </Paper>
         </Container>
     );
 }

@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 const pedidoItemSchema = z.object({
+  menuId: z.string(),
   nombre: z.string(),
   precio: z.number(),
-  cantidad: z.number(),
+  cantidad: z.number().min(1),
   categoria: z.string().optional(),
-  descripcion: z.string().optional()
+  nota: z.string().optional()
 });
 
 export const pedidoZodSchema = z.object({

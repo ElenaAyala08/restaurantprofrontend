@@ -20,6 +20,8 @@ import ErrorMessage from '../../components/ErrorMessage';
 const ChangePasswordUsuarioPage = () => {
     const navigate = useNavigate();
     const usuarioInfo = getAuthUsuario();
+
+    console.log("Contenido de usuarioInfo:", usuarioInfo);
     
     const [errors, setErrors] = useState([]); 
     const [formData, setFormData] = useState({
@@ -32,7 +34,7 @@ const ChangePasswordUsuarioPage = () => {
 
     const fetchUsuario = async () => {
         try {
-            const response = await getUsuarioById(usuarioInfo.id);
+            const response = await getUsuarioById(usuarioInfo._id);
             setFormData(response.data);
         } catch (error) {
             console.error('Error fetching usuario:', error);
@@ -60,7 +62,7 @@ const ChangePasswordUsuarioPage = () => {
                 }));
                 setErrors(listaErrores);
             } else {
-                await changePasswordUsuario(usuarioInfo.id, formDataChange);
+                await changePasswordUsuario(usuarioInfo._id, formDataChange);
                 navigate('/usuario/login');
             }
         } catch (error) {

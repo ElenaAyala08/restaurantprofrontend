@@ -12,4 +12,4 @@ export const getUsuarioById = (id)=> api.get(`/api/usuario/${id}`);
 export const createUsuario = (usuarioData)=> api.post('/api/usuario', usuarioData);
 export const updateUsuario = (id, usuarioData)=> api.put(`/api/usuario/${id}`, usuarioData);
 export const loginUsuario = (usuarioData)=> api.post('/api/usuario/login', usuarioData);
-export const changePasswordUsuario = (id, usuarioData)=> api.put(`/api/usuario/${id}/change-password`, usuarioData);
+export const changePasswordUsuario = (id, usuarioData)=> api.put(`/api/usuario/${id}/changepassword`, usuarioData);

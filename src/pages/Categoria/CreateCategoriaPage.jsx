@@ -18,24 +18,32 @@ const CreateCategoriaPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrors([]); 
+        
+        // 1. Validación de Frontend con Zod
+        const resultado = categoriaZodSchema.safeParse(formData);
+        
+        if (!resultado.success) {
+            const listaErrores = resultado.error.issues.map(issue => ({
+                campo: issue.path[0], 
+                mensaje: issue.message
+            }));
+            return setErrors(listaErrores);
+        }
+
         try {
-            const resultado = categoriaZodSchema.safeParse(formData);
-            if (!resultado.success) {
-                const listaErrores = resultado.error.issues.map(issue => ({
-                    campo: issue.path[0], mensaje: issue.message
-                }));
-                setErrors(listaErrores);
-            } else {
-                await createCategoria(formData);
-                navigate('/categorias');
-            }
+            // 2. Envío a la API
+            await createCategoria(formData);
+            navigate('/categoria');
         } catch (error) {
-            const serverMsg = error.response?.data?.errores ? error.response.data.errores.join(', ') : error.message;
+            // 3. Manejo de errores del Servidor (Mongoose/Express)
+            const serverErrors = error.response?.data?.errores;
+            const serverMsg = serverErrors ? serverErrors.join(', ') : error.message;
             setErrors([{ campo: 'SERVER', mensaje: serverMsg }]);
         }
     };
 
-    const hasError = (fieldName) => errors.some(err => err.campo === fieldName);
+    // Función auxiliar para obtener el mensaje de error de un campo específico
+    const getFieldError = (fieldName) => errors.find(err => err.campo === fieldName)?.mensaje;
 
     return (
         <Container maxWidth="sm" sx={{ mt: 8 }}>
@@ -44,37 +52,63 @@ const CreateCategoriaPage = () => {
                     Nueva Categoría
                 </Typography>
                 <Divider sx={{ mb: 4 }} />
+                
                 <form onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
                             <TextField
-                                fullWidth label="Nombre de Categoría"
+                                fullWidth 
+                                label="Nombre de Categoría"
                                 value={formData.nombre}
                                 onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                error={hasError('nombre')} required
+                                error={!!getFieldError('nombre')}
+                                helperText={getFieldError('nombre')}
+                                required
                             />
                         </Grid>
                         <Grid item xs={12}>
                             <TextField
-                                fullWidth label="Descripción" multiline rows={3}
+                                fullWidth 
+                                label="Descripción" 
+                                multiline 
+                                rows={3}
                                 value={formData.descripcion}
                                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                error={hasError('descripcion')}
+                                error={!!getFieldError('descripcion')}
+                                helperText={getFieldError('descripcion')}
+                                required
                             />
                         </Grid>
                         <Grid item xs={12}>
                             <Stack direction="row" spacing={2}>
-                                <Button variant="outlined" fullWidth startIcon={<ArrowBackIcon />} onClick={() => navigate('/categorias')}>
+                                <Button 
+                                    variant="outlined" 
+                                    fullWidth 
+                                    startIcon={<ArrowBackIcon />} 
+                                    onClick={() => navigate('/categoria')}
+                                >
                                     Cancelar
                                 </Button>
-                                <Button type="submit" variant="contained" fullWidth startIcon={<SaveIcon />} color="primary">
+                                <Button 
+                                    type="submit" 
+                                    variant="contained" 
+                                    fullWidth 
+                                    startIcon={<SaveIcon />} 
+                                    color="primary"
+                                >
                                     Crear Categoría
                                 </Button>
                             </Stack>
                         </Grid>
                     </Grid>
                 </form>
-                <Box sx={{ mt: 3 }}><ErrorMessage errors={errors} /></Box>
+
+                {/* Muestra errores generales o de servidor que no pertenecen a un input */}
+                {errors.some(err => err.campo === 'SERVER') && (
+                    <Box sx={{ mt: 3 }}>
+                        <ErrorMessage errors={errors.filter(err => err.campo === 'SERVER')} />
+                    </Box>
+                )}
             </Paper>
         </Container>
     );

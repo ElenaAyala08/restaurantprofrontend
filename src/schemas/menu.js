@@ -6,12 +6,15 @@ export const menuZodSchema = z.object({
     .min(1, 'El nombre no puede estar vacío'),
 
   descripcion: z
-    .string()
-    .optional(),
+    .string({ required_error: 'La descripción es obligatoria' })
+    .min(1, 'La descripción es obligatoria'),
 
-  precio: z
-    .number({ required_error: 'El precio es obligatorio' }),
+    precio: z.coerce.number({
+    required_error: 'El precio es obligatorio'
+  }).min(0, 'El precio no puede ser negativo'),
 
-  categoria: z
+ categoria: z
     .string({ required_error: 'La categoría es obligatoria' })
+    .min(1, 'La categoría es obligatoria')
+
 });

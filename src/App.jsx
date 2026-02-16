@@ -37,6 +37,7 @@ import EditMesaPage from './pages/Mesas/EditMesaPage';
 import PedidoPage from './pages/Pedidos/PedidoPage';
 import CreatePedidoPage from './pages/Pedidos/CreatePedidoPage';
 import EditPedidoPage from './pages/Pedidos/EditPedidoPage';
+import DetallePedidoPage from './pages/Pedidos/DetallePedidoPage';
 
 // --- REPORTE (Carpeta Reporte) ---
 import ReportePage from './pages/Reporte/ReportePage';
@@ -64,6 +65,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Administrador', 'Mesero']} />}>
             <Route path="/pedidos/create" element={<CreatePedidoPage />} />
             <Route path="/pedidos/edit/:id" element={<EditPedidoPage />} />
+            <Route path="/pedidos/detalle/:id" element={<DetallePedidoPage />} />
             <Route path="/mesas" element={<MesaPage />} />
             <Route path="/mesas/create" element={<CreateMesaPage />} />
             <Route path="/mesas/edit/:id" element={<EditMesaPage />} />
